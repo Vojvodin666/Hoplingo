@@ -13,6 +13,9 @@ const BRICK_FONT = 'bold 22px Arial';
 const BRICK_PADDING = 24;
 
 const CLOUD_COUNT = 4;
+const CLOUD_SPEED_MIN = 15;
+const CLOUD_SPEED_MAX = 30;
+const SUN_SPEED = 6; // px/s, slower than the clouds
 const TREE_SPEED = 50; // px/s, slower than bricks for a background parallax feel
 
 // Mutable, recomputed on load/resize since the game runs fullscreen.
@@ -21,6 +24,7 @@ let BRICK_SPEED, BRICK_Y_MIN, BRICK_Y_MAX;
 
 // Ambient background scenery (independent of gameplay state).
 let clouds = [];
+let sun = null;
 let trees = [];
 let ambientElapsed = 0;
 let nextTreeAt = 1500;
@@ -39,6 +43,7 @@ function resizeCanvas() {
   BRICK_Y_MAX = GROUND_Y - BRICK_HEIGHT - 10;
   if (!state.airborne) state.animalY = GROUND_Y;
   if (clouds.length === 0) initClouds();
+  if (!sun) initSun();
 }
 
 function initClouds() {
@@ -48,9 +53,16 @@ function initClouds() {
       x: Math.random() * W,
       y: 30 + Math.random() * (H * 0.35),
       scale: 0.7 + Math.random() * 0.8,
-      speed: 15 + Math.random() * 15,
+      speed: CLOUD_SPEED_MIN + Math.random() * (CLOUD_SPEED_MAX - CLOUD_SPEED_MIN),
     });
   }
+}
+
+function initSun() {
+  sun = {
+    x: W * 0.8,
+    y: H * 0.12,
+  };
 }
 
 // ---- Word banks ----
@@ -513,8 +525,14 @@ function updateAmbientScenery(dt) {
       c.x = W + 80;
       c.y = 30 + Math.random() * (H * 0.35);
       c.scale = 0.7 + Math.random() * 0.8;
-      c.speed = 15 + Math.random() * 15;
+      c.speed = CLOUD_SPEED_MIN + Math.random() * (CLOUD_SPEED_MAX - CLOUD_SPEED_MIN);
     }
+  }
+
+  sun.x -= SUN_SPEED * dt;
+  if (sun.x < -60) {
+    sun.x = W + 60;
+    sun.y = H * (0.08 + Math.random() * 0.12);
   }
 
   if (ambientElapsed >= nextTreeAt) {
@@ -603,6 +621,27 @@ function drawBackground() {
   ctx.fillRect(0, H - GRASS_HEIGHT, W, GRASS_HEIGHT);
 }
 
+function drawSun() {
+  const R = 36;
+  ctx.save();
+  ctx.translate(sun.x, sun.y);
+  ctx.strokeStyle = '#ffcc33';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 8; i++) {
+    const angle = (Math.PI * 2 * i) / 8;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * (R + 6), Math.sin(angle) * (R + 6));
+    ctx.lineTo(Math.cos(angle) * (R + 18), Math.sin(angle) * (R + 18));
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#ffcc33';
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawClouds() {
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
   for (const c of clouds) {
@@ -670,6 +709,7 @@ function drawBricks() {
 
 function render() {
   drawBackground();
+  drawSun();
   drawClouds();
   drawTrees();
   drawBricks();
