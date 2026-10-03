@@ -6,7 +6,7 @@ const GRAVITY = 1800; // px/s^2
 const ANIMAL_SIZE = 70;
 const ANIMAL_X = 120;
 
-const BRICK_SPEED_RATIO = 0.11; // fraction of screen width crossed per second
+const BRICK_SPEED_RATIO = 0.09; // fraction of screen width crossed per second
 const BRICK_SPAWN_INTERVAL = 2; // seconds
 const BRICK_HEIGHT = 50;
 const BRICK_FONT = 'bold 22px Arial';
