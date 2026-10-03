@@ -2,28 +2,28 @@
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   background: #2b2b3a;
   font-family: "Trebuchet MS", Arial, sans-serif;
 }
 
 #game-container {
   position: relative;
-  width: 900px;
-  height: 500px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  border-radius: 12px;
-  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
 }
 
 canvas {
   display: block;
+  width: 100%;
+  height: 100%;
   background: #bdeaff;
+  touch-action: none;
 }
 
 #hud {
@@ -31,12 +31,12 @@ canvas {
   top: 0;
   left: 0;
   width: 100%;
-  padding: 14px 20px;
+  padding: clamp(10px, 2vw, 20px);
   display: flex;
   justify-content: space-between;
   align-items: center;
   pointer-events: none;
-  font-size: 22px;
+  font-size: clamp(16px, 2.2vw, 24px);
   font-weight: bold;
   color: #2b2b3a;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
@@ -57,10 +57,10 @@ canvas {
 
 #message {
   position: absolute;
-  top: 60px;
+  top: 70px;
   left: 50%;
   transform: translateX(-50%) scale(0.8);
-  font-size: 36px;
+  font-size: clamp(24px, 4vw, 40px);
   color: #ff6b35;
   text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
   opacity: 0;
@@ -73,10 +73,10 @@ canvas {
   transform: translateX(-50%) scale(1);
 }
 
-#start-screen {
+.overlay {
   position: absolute;
   inset: 0;
-  background: rgba(20, 20, 35, 0.85);
+  background: rgba(20, 20, 35, 0.9);
   color: white;
   display: flex;
   flex-direction: column;
@@ -86,23 +86,23 @@ canvas {
   padding: 20px;
 }
 
-#start-screen.hidden {
+.overlay.hidden {
   display: none;
 }
 
 #start-screen h1 {
-  font-size: 56px;
+  font-size: clamp(36px, 7vw, 64px);
   margin: 0 0 10px;
   color: #ffd166;
 }
 
 #start-screen p {
   margin: 4px 0;
-  font-size: 18px;
+  font-size: clamp(14px, 2vw, 18px);
 }
 
 #start-screen .hint {
-  font-size: 15px;
+  font-size: clamp(12px, 1.5vw, 15px);
   opacity: 0.8;
   margin-bottom: 24px;
 }
@@ -110,10 +110,12 @@ canvas {
 #character-select {
   display: flex;
   gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .char-btn {
-  font-size: 56px;
+  font-size: clamp(40px, 7vw, 56px);
   background: rgba(255, 255, 255, 0.1);
   border: 3px solid transparent;
   border-radius: 16px;
@@ -126,4 +128,71 @@ canvas {
   transform: translateY(-4px) scale(1.08);
   border-color: #ffd166;
   background: rgba(255, 255, 255, 0.2);
+}
+
+#sentence-preview h2 {
+  font-size: clamp(22px, 4vw, 32px);
+  color: #ffd166;
+  margin: 0 0 24px;
+}
+
+#preview-text {
+  font-size: clamp(28px, 6vw, 48px);
+  font-weight: bold;
+  letter-spacing: 3px;
+  margin-bottom: 36px;
+  max-width: 90vw;
+}
+
+#start-btn {
+  font-size: clamp(18px, 3vw, 24px);
+  font-weight: bold;
+  padding: 14px 44px;
+  border: none;
+  border-radius: 12px;
+  background: #ffd166;
+  color: #2b2b3a;
+  cursor: pointer;
+  transition: transform 0.15s, background 0.15s;
+}
+
+#start-btn:hover {
+  transform: translateY(-3px);
+  background: #ffdd85;
+}
+
+#rotate-hint {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  background: #1a1a28;
+  color: white;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+#rotate-icon {
+  font-size: 64px;
+  display: inline-block;
+  animation: rotate-hint-spin 1.6s ease-in-out infinite;
+}
+
+#rotate-hint p {
+  font-size: 20px;
+  margin-top: 16px;
+}
+
+@keyframes rotate-hint-spin {
+  0%, 20% { transform: rotate(0deg); }
+  50%, 70% { transform: rotate(-90deg); }
+  100% { transform: rotate(-90deg); }
+}
+
+@media (orientation: portrait) and (max-width: 900px) {
+  #rotate-hint {
+    display: flex;
+  }
 }

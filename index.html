@@ -8,7 +8,7 @@
 </head>
 <body>
 <div id="game-container">
-  <canvas id="gameCanvas" width="900" height="500"></canvas>
+  <canvas id="gameCanvas"></canvas>
 
   <div id="hud">
     <div id="sentence"></div>
@@ -16,7 +16,7 @@
     <div id="message"></div>
   </div>
 
-  <div id="start-screen">
+  <div id="start-screen" class="overlay">
     <h1>Hoplingo</h1>
     <p>Vyber si zvířátko a chytej cihličky se správnými slovy!</p>
     <p class="hint">Mezerník = skok (ve vzduchu ještě jednou mezerník = druhý skok)</p>
@@ -26,6 +26,17 @@
       <button class="char-btn" data-char="🐻" aria-label="Medvěd">🐻</button>
       <button class="char-btn" data-char="🐸" aria-label="Žabka">🐸</button>
     </div>
+  </div>
+
+  <div id="sentence-preview" class="overlay hidden">
+    <h2>Zapamatuj si větu:</h2>
+    <div id="preview-text"></div>
+    <button id="start-btn">Start</button>
+  </div>
+
+  <div id="rotate-hint">
+    <div id="rotate-icon">📱</div>
+    <p>Otoč telefon na šířku</p>
   </div>
 </div>
 <script src="script.js"></script>

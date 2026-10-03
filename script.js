@@ -1,27 +1,35 @@
 // ---- Setup ----
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const W = canvas.width;
-const H = canvas.height;
-
-const GRASS_HEIGHT = H / 3;
-const GROUND_Y = H - 30; // animal feet baseline, a bit above the bottom edge
 
 const GRAVITY = 1800; // px/s^2
-const JUMP_HEIGHT = H / 3; // single jump reaches up to one third of the screen
-const JUMP_VELOCITY = -Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
+const ANIMAL_SIZE = 70;
+const ANIMAL_X = 120;
 
-const ANIMAL_SIZE = 60;
-const ANIMAL_X = 90;
-
-const BRICK_SPEED = 180; // px/s
+const BRICK_SPEED_RATIO = 0.14; // fraction of screen width crossed per second
 const BRICK_SPAWN_INTERVAL = 1.6; // seconds
-const BRICK_HEIGHT = 44;
-const BRICK_FONT = 'bold 20px Arial';
+const BRICK_HEIGHT = 50;
+const BRICK_FONT = 'bold 22px Arial';
 const BRICK_PADDING = 24;
 
-const BRICK_Y_MIN = Math.max(20, GROUND_Y - JUMP_HEIGHT * 1.7 - BRICK_HEIGHT);
-const BRICK_Y_MAX = GROUND_Y - BRICK_HEIGHT - 10;
+// Mutable, recomputed on load/resize since the game runs fullscreen.
+let W, H, GRASS_HEIGHT, GROUND_Y, JUMP_HEIGHT, JUMP_VELOCITY;
+let BRICK_SPEED, BRICK_Y_MIN, BRICK_Y_MAX;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  W = canvas.width;
+  H = canvas.height;
+  GRASS_HEIGHT = H / 3;
+  GROUND_Y = H - 30;
+  JUMP_HEIGHT = H / 3; // single jump reaches up to one third of the screen
+  JUMP_VELOCITY = -Math.sqrt(2 * GRAVITY * JUMP_HEIGHT);
+  BRICK_SPEED = W * BRICK_SPEED_RATIO;
+  BRICK_Y_MIN = Math.max(20, GROUND_Y - JUMP_HEIGHT * 1.7 - BRICK_HEIGHT);
+  BRICK_Y_MAX = GROUND_Y - BRICK_HEIGHT - 10;
+  if (!state.airborne) state.animalY = GROUND_Y;
+}
 
 // ---- Word banks ----
 const SENTENCES = [
@@ -60,18 +68,22 @@ const state = {
   targetIndex: 0,
   collected: [],
   errors: 0,
-  animalY: GROUND_Y,
+  animalY: 0,
   vy: 0,
   airborne: false,
   usedExtraJump: false,
   lastTime: 0,
-  running: false,
+  running: false, // the rAF loop is active
+  sentenceActive: false, // bricks are currently spawning/moving for this sentence
 };
 
 const sentenceEl = document.getElementById('sentence');
 const errorsEl = document.getElementById('errors');
 const messageEl = document.getElementById('message');
 const startScreenEl = document.getElementById('start-screen');
+const sentencePreviewEl = document.getElementById('sentence-preview');
+const previewTextEl = document.getElementById('preview-text');
+const startBtn = document.getElementById('start-btn');
 
 // ---- Helpers ----
 function randomFrom(arr) {
@@ -132,7 +144,7 @@ function showMessage(text) {
   }, 1400);
 }
 
-function startNewSentence() {
+function prepareSentence() {
   state.sentenceWords = pickSentence();
   state.collected = new Array(state.sentenceWords.length).fill(false);
   state.targetIndex = 0;
@@ -143,10 +155,33 @@ function startNewSentence() {
   updateSentenceDisplay();
 }
 
+function showSentencePreview() {
+  previewTextEl.textContent = state.sentenceWords.join(' ');
+  sentencePreviewEl.classList.remove('hidden');
+  state.sentenceActive = false;
+}
+
+function activateSentence() {
+  sentencePreviewEl.classList.add('hidden');
+  state.sentenceActive = true;
+  state.spawnTimer = 0;
+  if (!state.running) {
+    state.running = true;
+    state.errors = 0;
+    updateErrorsDisplay();
+    state.lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+}
+
 function checkSentenceComplete() {
   if (state.targetIndex >= state.sentenceWords.length) {
+    state.sentenceActive = false;
     showMessage('Super! 🎉');
-    setTimeout(startNewSentence, 1500);
+    setTimeout(() => {
+      prepareSentence();
+      showSentencePreview();
+    }, 1500);
   }
 }
 
@@ -178,11 +213,22 @@ function handleJumpInput() {
   }
 }
 
+function canAcceptJumpInput() {
+  return state.running && sentencePreviewEl.classList.contains('hidden');
+}
+
 document.addEventListener('keydown', e => {
   if (e.code !== 'Space') return;
   e.preventDefault();
   if (e.repeat) return;
-  if (!state.running) return;
+  if (!canAcceptJumpInput()) return;
+  handleJumpInput();
+});
+
+// Tap/click anywhere on the canvas also jumps, so it works on mobile touchscreens.
+canvas.addEventListener('pointerdown', e => {
+  if (!canAcceptJumpInput()) return;
+  e.preventDefault();
   handleJumpInput();
 });
 
@@ -190,20 +236,25 @@ document.querySelectorAll('.char-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     state.character = btn.dataset.char;
     startScreenEl.classList.add('hidden');
-    startGame();
+    prepareSentence();
+    showSentencePreview();
   });
 });
 
+startBtn.addEventListener('click', activateSentence);
+
 // ---- Update / render ----
 function update(dt) {
-  state.spawnTimer += dt;
-  if (state.spawnTimer >= BRICK_SPAWN_INTERVAL && state.nextSpawnIndex < state.queue.length) {
-    spawnBrick();
-    state.spawnTimer = 0;
-  }
+  if (state.sentenceActive) {
+    state.spawnTimer += dt;
+    if (state.spawnTimer >= BRICK_SPAWN_INTERVAL && state.nextSpawnIndex < state.queue.length) {
+      spawnBrick();
+      state.spawnTimer = 0;
+    }
 
-  for (const b of state.bricks) {
-    b.x -= BRICK_SPEED * dt;
+    for (const b of state.bricks) {
+      b.x -= BRICK_SPEED * dt;
+    }
   }
 
   if (state.airborne) {
@@ -216,6 +267,8 @@ function update(dt) {
       state.usedExtraJump = false;
     }
   }
+
+  if (!state.sentenceActive) return;
 
   const animalRect = {
     x: ANIMAL_X - ANIMAL_SIZE / 2,
@@ -263,10 +316,16 @@ function drawBackground() {
 }
 
 function drawAnimal() {
+  ctx.save();
+  // Animal emoji face left by default; mirror horizontally so it faces right,
+  // towards the incoming bricks.
+  ctx.translate(ANIMAL_X, state.animalY);
+  ctx.scale(-1, 1);
   ctx.font = `${ANIMAL_SIZE}px serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText(state.character, ANIMAL_X, state.animalY);
+  ctx.fillText(state.character, 0, 0);
+  ctx.restore();
 }
 
 function drawBricks() {
@@ -302,11 +361,7 @@ function loop(timestamp) {
   if (state.running) requestAnimationFrame(loop);
 }
 
-function startGame() {
-  state.running = true;
-  state.errors = 0;
-  updateErrorsDisplay();
-  startNewSentence();
-  state.lastTime = performance.now();
-  requestAnimationFrame(loop);
-}
+// ---- Init ----
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 300));
