@@ -94,6 +94,7 @@ const DECOY_WORDS = [
 // ---- Game state ----
 const state = {
   character: '🦄',
+  characterFilter: 'none',
   sentenceWords: [],
   queue: [],
   bricks: [],
@@ -111,8 +112,6 @@ const state = {
   sentenceActive: false, // bricks are currently spawning/moving for this sentence
 };
 
-const sentenceEl = document.getElementById('sentence');
-const errorsEl = document.getElementById('errors');
 const startScreenEl = document.getElementById('start-screen');
 const sentencePreviewEl = document.getElementById('sentence-preview');
 const previewTextEl = document.getElementById('preview-text');
@@ -162,17 +161,6 @@ function buildQueue(sentenceWords) {
   return queue;
 }
 
-function updateSentenceDisplay() {
-  const text = state.sentenceWords
-    .map((w, i) => (state.collected[i] ? w : '_'.repeat(w.length)))
-    .join('  ');
-  sentenceEl.textContent = text;
-}
-
-function updateErrorsDisplay() {
-  errorsEl.textContent = `Chyby: ${state.errors}`;
-}
-
 function prepareSentence() {
   state.sentenceWords = pickSentence();
   state.collected = new Array(state.sentenceWords.length).fill(false);
@@ -181,7 +169,6 @@ function prepareSentence() {
   state.nextSpawnIndex = 0;
   state.bricks = [];
   state.spawnTimer = 0;
-  updateSentenceDisplay();
 }
 
 function showSentencePreview() {
@@ -197,7 +184,6 @@ function activateSentence() {
   if (!state.running) {
     state.running = true;
     state.errors = 0;
-    updateErrorsDisplay();
     state.lastTime = performance.now();
     requestAnimationFrame(loop);
   }
@@ -497,7 +483,7 @@ canvas.addEventListener('pointerdown', e => {
 
 document.querySelectorAll('.char-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    state.character = btn.dataset.char;
+    state.characterFilter = btn.dataset.filter;
     startScreenEl.classList.add('hidden');
     prepareSentence();
     showSentencePreview();
@@ -510,7 +496,6 @@ newGameBtn.addEventListener('click', () => {
   resultScreenEl.classList.add('hidden');
   stopConfetti();
   state.errors = 0;
-  updateErrorsDisplay();
   prepareSentence();
   showSentencePreview();
 });
@@ -588,12 +573,10 @@ function update(dt) {
       if (b.isCorrect && b.correctIndex === state.targetIndex) {
         state.collected[b.correctIndex] = true;
         state.targetIndex++;
-        updateSentenceDisplay();
         playCorrect();
         checkSentenceComplete();
       } else {
         state.errors++;
-        updateErrorsDisplay();
         playError();
       }
       state.bricks.splice(i, 1);
@@ -603,10 +586,8 @@ function update(dt) {
     if (b.x + b.w < 0) {
       if (b.isCorrect && b.correctIndex === state.targetIndex) {
         state.errors++;
-        updateErrorsDisplay();
         playError();
         state.targetIndex++;
-        updateSentenceDisplay();
         checkSentenceComplete();
       }
       state.bricks.splice(i, 1);
@@ -639,6 +620,28 @@ function drawSun() {
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, Math.PI * 2);
   ctx.fill();
+
+  // Rosy cheeks.
+  ctx.fillStyle = 'rgba(255, 140, 90, 0.5)';
+  ctx.beginPath();
+  ctx.arc(-R * 0.55, R * 0.2, R * 0.2, 0, Math.PI * 2);
+  ctx.arc(R * 0.55, R * 0.2, R * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Beaming smiley face.
+  ctx.fillStyle = '#8a5a1a';
+  ctx.beginPath();
+  ctx.arc(-R * 0.32, -R * 0.1, R * 0.1, 0, Math.PI * 2);
+  ctx.arc(R * 0.32, -R * 0.1, R * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#8a5a1a';
+  ctx.lineWidth = R * 0.12;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(0, R * 0.05, R * 0.45, Math.PI * 0.15, Math.PI * 0.85);
+  ctx.stroke();
+
   ctx.restore();
 }
 
@@ -677,6 +680,7 @@ function drawTrees() {
 
 function drawAnimal() {
   ctx.save();
+  ctx.filter = state.characterFilter;
   // Animal emoji face left by default; mirror horizontally so it faces right,
   // towards the incoming bricks.
   ctx.translate(ANIMAL_X, state.animalY);

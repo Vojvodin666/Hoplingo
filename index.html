@@ -10,20 +10,14 @@
 <div id="game-container">
   <canvas id="gameCanvas"></canvas>
 
-  <div id="hud">
-    <div id="sentence"></div>
-    <div id="errors">Chyby: 0</div>
-  </div>
-
   <div id="start-screen" class="overlay">
     <h1>Hoplingo</h1>
     <p>Vyber si zvířátko a chytej cihličky se správnými slovy!</p>
     <p class="hint">Mezerník = skok (ve vzduchu ještě jednou mezerník = druhý skok)</p>
     <div id="character-select">
-      <button class="char-btn" data-char="🦄" aria-label="Jednorožec">🦄</button>
-      <button class="char-btn" data-char="🐊" aria-label="Krokodýl">🐊</button>
-      <button class="char-btn" data-char="🐻" aria-label="Medvěd">🐻</button>
-      <button class="char-btn" data-char="🐸" aria-label="Žabka">🐸</button>
+      <button class="char-btn" data-filter="none" style="filter: none" aria-label="Jednorožec – klasický">🦄</button>
+      <button class="char-btn" data-filter="hue-rotate(120deg) saturate(1.6)" style="filter: hue-rotate(120deg) saturate(1.6)" aria-label="Jednorožec – růžový">🦄</button>
+      <button class="char-btn" data-filter="hue-rotate(250deg) saturate(1.6)" style="filter: hue-rotate(250deg) saturate(1.6)" aria-label="Jednorožec – modrý">🦄</button>
     </div>
   </div>
 
