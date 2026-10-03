@@ -78,6 +78,11 @@ canvas {
   transition: transform 0.15s, border-color 0.15s, background 0.15s;
 }
 
+.char-face {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
 .char-btn:hover {
   transform: translateY(-4px) scale(1.08);
   border-color: #ffd166;
