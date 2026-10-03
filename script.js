@@ -202,14 +202,104 @@ function spawnBrick() {
   state.nextSpawnIndex++;
 }
 
+// ---- Audio ----
+let audioCtx = null;
+
+function getAudioContext() {
+  if (!audioCtx) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioCtx();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function createNoiseBuffer(ctx, duration) {
+  const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  return buffer;
+}
+
+function playHoofBeat(ctx, time, volume) {
+  const noise = ctx.createBufferSource();
+  noise.buffer = createNoiseBuffer(ctx, 0.08);
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 180;
+  filter.Q.value = 1.2;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.exponentialRampToValueAtTime(volume, time + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.08);
+
+  noise.connect(filter).connect(gain).connect(ctx.destination);
+  noise.start(time);
+  noise.stop(time + 0.09);
+}
+
+function playGallop() {
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  // Four-beat gallop rhythm: da-da-dum-dum.
+  const beats = [
+    { t: 0, v: 0.5 },
+    { t: 0.09, v: 0.45 },
+    { t: 0.22, v: 0.6 },
+    { t: 0.29, v: 0.55 },
+  ];
+  beats.forEach(b => playHoofBeat(ctx, now + b.t, b.v));
+}
+
+function playCorrect() {
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  // Quick two-note upward "ding-ding".
+  [660, 880].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    const gain = ctx.createGain();
+    const t = now + i * 0.09;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.4, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  });
+}
+
+function playError() {
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  // Short downward buzz, kept quiet so it doesn't feel harsh for kids.
+  const osc = ctx.createOscillator();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(220, now);
+  osc.frequency.exponentialRampToValueAtTime(110, now + 0.25);
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.3);
+}
+
 // ---- Input ----
 function handleJumpInput() {
   if (!state.airborne) {
     state.airborne = true;
     state.vy = JUMP_VELOCITY;
+    playGallop();
   } else if (!state.usedExtraJump) {
     state.vy = JUMP_VELOCITY;
     state.usedExtraJump = true;
+    playGallop();
   }
 }
 
@@ -286,10 +376,12 @@ function update(dt) {
         state.collected[b.correctIndex] = true;
         state.targetIndex++;
         updateSentenceDisplay();
+        playCorrect();
         checkSentenceComplete();
       } else {
         state.errors++;
         updateErrorsDisplay();
+        playError();
       }
       state.bricks.splice(i, 1);
       continue;
@@ -299,6 +391,7 @@ function update(dt) {
       if (b.isCorrect && b.correctIndex === state.targetIndex) {
         state.errors++;
         updateErrorsDisplay();
+        playError();
         state.targetIndex++;
         updateSentenceDisplay();
         checkSentenceComplete();
