@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hoplingo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="game-container">
+  <canvas id="gameCanvas" width="900" height="500"></canvas>
+
+  <div id="hud">
+    <div id="sentence"></div>
+    <div id="errors">Chyby: 0</div>
+    <div id="message"></div>
+  </div>
+
+  <div id="start-screen">
+    <h1>Hoplingo</h1>
+    <p>Vyber si zvířátko a chytej cihličky se správnými slovy!</p>
+    <p class="hint">Mezerník = skok (ve vzduchu ještě jednou mezerník = druhý skok)</p>
+    <div id="character-select">
+      <button class="char-btn" data-char="🦄" aria-label="Jednorožec">🦄</button>
+      <button class="char-btn" data-char="🐊" aria-label="Krokodýl">🐊</button>
+      <button class="char-btn" data-char="🐻" aria-label="Medvěd">🐻</button>
+      <button class="char-btn" data-char="🐸" aria-label="Žabka">🐸</button>
+    </div>
+  </div>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
