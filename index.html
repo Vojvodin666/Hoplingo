@@ -13,7 +13,6 @@
   <div id="hud">
     <div id="sentence"></div>
     <div id="errors">Chyby: 0</div>
-    <div id="message"></div>
   </div>
 
   <div id="start-screen" class="overlay">
@@ -31,8 +30,16 @@
   <div id="sentence-preview" class="overlay hidden">
     <h2>Zapamatuj si větu:</h2>
     <div id="preview-text"></div>
-    <button id="start-btn">Start</button>
+    <button id="start-btn" class="primary-btn">Start</button>
   </div>
+
+  <div id="result-screen" class="overlay hidden">
+    <h2>Výsledek</h2>
+    <div id="result-errors"></div>
+    <button id="new-game-btn" class="primary-btn">Nová hra</button>
+  </div>
+
+  <canvas id="confetti-canvas"></canvas>
 
   <div id="rotate-hint">
     <div id="rotate-icon">📱</div>

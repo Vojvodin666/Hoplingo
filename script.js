@@ -12,9 +12,18 @@ const BRICK_HEIGHT = 50;
 const BRICK_FONT = 'bold 22px Arial';
 const BRICK_PADDING = 24;
 
+const CLOUD_COUNT = 4;
+const TREE_SPEED = 50; // px/s, slower than bricks for a background parallax feel
+
 // Mutable, recomputed on load/resize since the game runs fullscreen.
 let W, H, GRASS_HEIGHT, GROUND_Y, JUMP_HEIGHT, JUMP_VELOCITY;
 let BRICK_SPEED, BRICK_Y_MIN, BRICK_Y_MAX;
+
+// Ambient background scenery (independent of gameplay state).
+let clouds = [];
+let trees = [];
+let ambientElapsed = 0;
+let nextTreeAt = 1500;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -29,6 +38,19 @@ function resizeCanvas() {
   BRICK_Y_MIN = Math.max(20, GROUND_Y - JUMP_HEIGHT * 1.7 - BRICK_HEIGHT);
   BRICK_Y_MAX = GROUND_Y - BRICK_HEIGHT - 10;
   if (!state.airborne) state.animalY = GROUND_Y;
+  if (clouds.length === 0) initClouds();
+}
+
+function initClouds() {
+  clouds = [];
+  for (let i = 0; i < CLOUD_COUNT; i++) {
+    clouds.push({
+      x: Math.random() * W,
+      y: 30 + Math.random() * (H * 0.35),
+      scale: 0.7 + Math.random() * 0.8,
+      speed: 15 + Math.random() * 15,
+    });
+  }
 }
 
 // ---- Word banks ----
@@ -79,11 +101,15 @@ const state = {
 
 const sentenceEl = document.getElementById('sentence');
 const errorsEl = document.getElementById('errors');
-const messageEl = document.getElementById('message');
 const startScreenEl = document.getElementById('start-screen');
 const sentencePreviewEl = document.getElementById('sentence-preview');
 const previewTextEl = document.getElementById('preview-text');
 const startBtn = document.getElementById('start-btn');
+const resultScreenEl = document.getElementById('result-screen');
+const resultErrorsEl = document.getElementById('result-errors');
+const newGameBtn = document.getElementById('new-game-btn');
+const confettiCanvas = document.getElementById('confetti-canvas');
+const confettiCtx = confettiCanvas.getContext('2d');
 
 // ---- Helpers ----
 function randomFrom(arr) {
@@ -135,15 +161,6 @@ function updateErrorsDisplay() {
   errorsEl.textContent = `Chyby: ${state.errors}`;
 }
 
-function showMessage(text) {
-  messageEl.textContent = text;
-  messageEl.classList.add('show');
-  setTimeout(() => {
-    messageEl.classList.remove('show');
-    messageEl.textContent = '';
-  }, 1400);
-}
-
 function prepareSentence() {
   state.sentenceWords = pickSentence();
   state.collected = new Array(state.sentenceWords.length).fill(false);
@@ -177,11 +194,155 @@ function activateSentence() {
 function checkSentenceComplete() {
   if (state.targetIndex >= state.sentenceWords.length) {
     state.sentenceActive = false;
-    showMessage('Super! 🎉');
-    setTimeout(() => {
-      prepareSentence();
-      showSentencePreview();
-    }, 1500);
+    showResultScreen();
+  }
+}
+
+function showResultScreen() {
+  const errors = state.errors;
+  resultScreenEl.classList.toggle('perfect', errors === 0);
+
+  if (errors === 0) {
+    resultErrorsEl.textContent = 'Perfektní! 🎉';
+    startConfetti();
+  } else if (errors === 1) {
+    resultErrorsEl.textContent = 'Super';
+  } else {
+    resultErrorsEl.textContent = 'Příště to bude lepší';
+  }
+
+  resultScreenEl.classList.remove('hidden');
+}
+
+// ---- Confetti / fireworks (shown on a perfect, error-free sentence) ----
+const CONFETTI_COLORS = ['#ff6b35', '#ffd166', '#06d6a0', '#118ab2', '#ef476f', '#ffffff'];
+const CONFETTI_DURATION = 4000; // ms
+
+let confettiParticles = [];
+let confettiAnimId = null;
+let confettiLastTime = 0;
+let confettiElapsed = 0;
+let fireworksRemaining = 0;
+let nextFireworkAt = 0;
+
+function randomConfettiColor() {
+  return CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+}
+
+function createStreamers() {
+  const list = [];
+  const w = confettiCanvas.width;
+  const h = confettiCanvas.height;
+  for (let i = 0; i < 100; i++) {
+    list.push({
+      type: 'streamer',
+      x: Math.random() * w,
+      y: -20 - Math.random() * h,
+      vx: (Math.random() - 0.5) * 50,
+      vy: 90 + Math.random() * 110,
+      size: 6 + Math.random() * 6,
+      color: randomConfettiColor(),
+      rotation: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 6,
+    });
+  }
+  return list;
+}
+
+function spawnFirework() {
+  const w = confettiCanvas.width;
+  const h = confettiCanvas.height;
+  const cx = w * (0.15 + Math.random() * 0.7);
+  const cy = h * (0.15 + Math.random() * 0.35);
+  const color = randomConfettiColor();
+  const count = 26;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count;
+    const speed = 70 + Math.random() * 90;
+    confettiParticles.push({
+      type: 'spark',
+      x: cx,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      color,
+      life: 1,
+    });
+  }
+}
+
+function startConfetti() {
+  confettiCanvas.width = window.innerWidth;
+  confettiCanvas.height = window.innerHeight;
+  confettiCanvas.style.display = 'block';
+  confettiParticles = createStreamers();
+  confettiElapsed = 0;
+  fireworksRemaining = 5;
+  nextFireworkAt = 200;
+  confettiLastTime = performance.now();
+  if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
+  confettiAnimId = requestAnimationFrame(confettiLoop);
+}
+
+function stopConfetti() {
+  if (confettiAnimId) {
+    cancelAnimationFrame(confettiAnimId);
+    confettiAnimId = null;
+  }
+  confettiParticles = [];
+  confettiCanvas.style.display = 'none';
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+}
+
+function confettiLoop(timestamp) {
+  const dt = Math.min((timestamp - confettiLastTime) / 1000, 0.05);
+  confettiLastTime = timestamp;
+  confettiElapsed += dt * 1000;
+
+  if (fireworksRemaining > 0 && confettiElapsed >= nextFireworkAt) {
+    spawnFirework();
+    fireworksRemaining--;
+    nextFireworkAt = confettiElapsed + 400 + Math.random() * 400;
+  }
+
+  confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+  const next = [];
+  for (const p of confettiParticles) {
+    if (p.type === 'streamer') {
+      p.vy += 60 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rotation += p.vr * dt;
+      confettiCtx.save();
+      confettiCtx.translate(p.x, p.y);
+      confettiCtx.rotate(p.rotation);
+      confettiCtx.fillStyle = p.color;
+      confettiCtx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      confettiCtx.restore();
+      if (p.y < confettiCanvas.height + 30) next.push(p);
+    } else if (p.type === 'spark') {
+      p.vy += 180 * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt * 0.8;
+      if (p.life > 0) {
+        confettiCtx.globalAlpha = Math.max(p.life, 0);
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.beginPath();
+        confettiCtx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+        confettiCtx.fill();
+        confettiCtx.globalAlpha = 1;
+        next.push(p);
+      }
+    }
+  }
+  confettiParticles = next;
+
+  if (confettiElapsed < CONFETTI_DURATION || confettiParticles.length > 0) {
+    confettiAnimId = requestAnimationFrame(confettiLoop);
+  } else {
+    stopConfetti();
   }
 }
 
@@ -333,8 +494,42 @@ document.querySelectorAll('.char-btn').forEach(btn => {
 
 startBtn.addEventListener('click', activateSentence);
 
+newGameBtn.addEventListener('click', () => {
+  resultScreenEl.classList.add('hidden');
+  stopConfetti();
+  state.errors = 0;
+  updateErrorsDisplay();
+  prepareSentence();
+  showSentencePreview();
+});
+
 // ---- Update / render ----
+function updateAmbientScenery(dt) {
+  ambientElapsed += dt * 1000;
+
+  for (const c of clouds) {
+    c.x -= c.speed * dt;
+    if (c.x < -80) {
+      c.x = W + 80;
+      c.y = 30 + Math.random() * (H * 0.35);
+      c.scale = 0.7 + Math.random() * 0.8;
+      c.speed = 15 + Math.random() * 15;
+    }
+  }
+
+  if (ambientElapsed >= nextTreeAt) {
+    trees.push({ x: W + 40, size: 0.8 + Math.random() * 0.6 });
+    nextTreeAt = ambientElapsed + 6000 + Math.random() * 8000;
+  }
+  for (let i = trees.length - 1; i >= 0; i--) {
+    trees[i].x -= TREE_SPEED * dt;
+    if (trees[i].x < -80) trees.splice(i, 1);
+  }
+}
+
 function update(dt) {
+  updateAmbientScenery(dt);
+
   if (state.sentenceActive) {
     state.spawnTimer += dt;
     if (state.spawnTimer >= BRICK_SPAWN_INTERVAL && state.nextSpawnIndex < state.queue.length) {
@@ -408,6 +603,39 @@ function drawBackground() {
   ctx.fillRect(0, H - GRASS_HEIGHT, W, GRASS_HEIGHT);
 }
 
+function drawClouds() {
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  for (const c of clouds) {
+    const r = 18 * c.scale;
+    ctx.beginPath();
+    ctx.ellipse(c.x, c.y, r * 1.6, r, 0, 0, Math.PI * 2);
+    ctx.ellipse(c.x - r * 1.3, c.y + r * 0.3, r * 1.1, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.ellipse(c.x + r * 1.3, c.y + r * 0.3, r * 1.1, r * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawTree(t) {
+  const trunkW = 10 * t.size;
+  const trunkH = 34 * t.size;
+  const baseY = GROUND_Y + 4;
+  const foliageR = 30 * t.size;
+
+  ctx.fillStyle = '#7a4a27';
+  ctx.fillRect(t.x - trunkW / 2, baseY - trunkH, trunkW, trunkH);
+
+  ctx.fillStyle = '#3f8f3f';
+  ctx.beginPath();
+  ctx.ellipse(t.x, baseY - trunkH - foliageR * 0.5, foliageR, foliageR * 0.9, 0, 0, Math.PI * 2);
+  ctx.ellipse(t.x - foliageR * 0.5, baseY - trunkH - foliageR * 0.2, foliageR * 0.7, foliageR * 0.6, 0, 0, Math.PI * 2);
+  ctx.ellipse(t.x + foliageR * 0.5, baseY - trunkH - foliageR * 0.2, foliageR * 0.7, foliageR * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawTrees() {
+  for (const t of trees) drawTree(t);
+}
+
 function drawAnimal() {
   ctx.save();
   // Animal emoji face left by default; mirror horizontally so it faces right,
@@ -442,6 +670,8 @@ function drawBricks() {
 
 function render() {
   drawBackground();
+  drawClouds();
+  drawTrees();
   drawBricks();
   drawAnimal();
 }

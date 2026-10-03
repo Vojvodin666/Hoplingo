@@ -55,27 +55,10 @@ canvas {
   border-radius: 10px;
 }
 
-#message {
-  position: absolute;
-  top: 70px;
-  left: 50%;
-  transform: translateX(-50%) scale(0.8);
-  font-size: clamp(24px, 4vw, 40px);
-  color: #ff6b35;
-  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.8);
-  opacity: 0;
-  transition: opacity 0.25s, transform 0.25s;
-  white-space: nowrap;
-}
-
-#message.show {
-  opacity: 1;
-  transform: translateX(-50%) scale(1);
-}
-
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 10;
   background: rgba(20, 20, 35, 0.9);
   color: white;
   display: flex;
@@ -130,12 +113,6 @@ canvas {
   background: rgba(255, 255, 255, 0.2);
 }
 
-#sentence-preview h2 {
-  font-size: clamp(22px, 4vw, 32px);
-  color: #ffd166;
-  margin: 0 0 24px;
-}
-
 #preview-text {
   font-size: clamp(28px, 6vw, 48px);
   font-weight: bold;
@@ -144,7 +121,37 @@ canvas {
   max-width: 90vw;
 }
 
-#start-btn {
+#sentence-preview h2,
+#result-screen h2 {
+  font-size: clamp(22px, 4vw, 32px);
+  color: #ffd166;
+  margin: 0 0 24px;
+}
+
+#result-errors {
+  font-size: clamp(28px, 6vw, 48px);
+  font-weight: bold;
+  margin-bottom: 36px;
+}
+
+#result-screen.perfect h2 {
+  font-size: clamp(30px, 6vw, 56px);
+}
+
+#result-screen.perfect #result-errors {
+  font-size: clamp(44px, 10vw, 96px);
+  color: #ffd166;
+}
+
+#confetti-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  display: none;
+}
+
+.primary-btn {
   font-size: clamp(18px, 3vw, 24px);
   font-weight: bold;
   padding: 14px 44px;
@@ -156,7 +163,7 @@ canvas {
   transition: transform 0.15s, background 0.15s;
 }
 
-#start-btn:hover {
+.primary-btn:hover {
   transform: translateY(-3px);
   background: #ffdd85;
 }
