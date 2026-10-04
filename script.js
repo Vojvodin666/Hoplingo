@@ -6,6 +6,28 @@ const GRAVITY = 1800; // px/s^2
 const ANIMAL_SIZE = 70;
 const ANIMAL_X = 120;
 
+// Horse artwork, traced from a reference coloring-book unicorn and converted
+// to local coordinates (origin at the hoof line, +x forward/right, +y down).
+// See the trace scripts kept alongside this file for how these were derived.
+const HORSE_OUTLINE = [[46.0,-91.0], [42.8,-90.3], [31.5,-81.3], [29.3,-81.6], [26.7,-85.4], [24.3,-86.2], [20.4,-80.4], [14.8,-78.2], [11.7,-74.8], [10.5,-71.2], [7.8,-69.5], [4.9,-66.1], [3.7,-62.0], [4.0,-58.9], [5.2,-56.5], [4.5,-53.6], [-10.7,-54.1], [-15.3,-52.6], [-18.5,-50.4], [-24.3,-58.2], [-27.4,-59.6], [-31.7,-59.6], [-38.7,-56.0], [-44.3,-57.4], [-45.7,-54.6], [-45.3,-50.7], [-47.9,-49.7], [-47.9,-43.7], [-45.5,-40.8], [-43.6,-39.8], [-45.3,-38.6], [-47.7,-38.6], [-47.9,-36.2], [-45.5,-32.8], [-39.2,-31.4], [-40.7,-29.2], [-45.0,-27.8], [-45.0,-26.3], [-42.8,-23.2], [-39.7,-21.7], [-40.4,-21.0], [-40.2,-17.4], [-37.8,-13.5], [-34.6,-12.1], [-31.0,-12.1], [-28.4,-13.0], [-25.9,-15.4], [-24.3,-22.0], [-24.5,-41.0], [-23.1,-42.5], [-22.3,-35.2], [-20.4,-28.7], [-22.3,-24.9], [-23.5,-17.6], [-24.3,-10.4], [-23.5,-2.7], [-19.7,-0.2], [-16.1,-0.2], [-12.7,-2.4], [-11.5,-6.0], [-9.1,-3.9], [-5.9,-2.9], [-2.8,-3.1], [-0.6,-4.3], [0.6,-6.3], [0.8,-9.9], [-2.5,-19.6], [-2.3,-23.7], [-1.6,-24.4], [7.8,-24.1], [8.3,-4.6], [11.0,-1.0], [13.2,0.0], [18.9,-0.7], [21.4,-4.6], [24.0,-2.9], [28.8,-3.1], [31.5,-4.8], [32.9,-7.5], [32.5,-12.8], [28.8,-20.5], [29.3,-28.5], [32.7,-35.2], [33.7,-39.6], [33.4,-45.1], [31.3,-53.1], [41.6,-52.1], [45.7,-53.6], [47.9,-56.2], [48.4,-60.3], [47.7,-62.8], [39.7,-70.7], [39.2,-74.8], [46.2,-86.2], [46.9,-89.6]];
+const HORN_PTS = [[39.2,-74.8], [46.2,-86.2], [46.9,-89.6], [46.0,-91.0], [42.8,-90.3], [31.5,-81.3], [29.3,-81.6]];
+const TAIL_PTS = [[-24.3,-58.2], [-27.4,-59.6], [-31.7,-59.6], [-38.7,-56.0], [-44.3,-57.4], [-45.7,-54.6], [-45.3,-50.7], [-47.9,-49.7], [-47.9,-43.7], [-45.5,-40.8], [-43.6,-39.8], [-45.3,-38.6], [-47.7,-38.6], [-47.9,-36.2], [-45.5,-32.8], [-39.2,-31.4], [-40.7,-29.2], [-45.0,-27.8], [-45.0,-26.3], [-42.8,-23.2], [-39.7,-21.7], [-40.4,-21.0], [-40.2,-17.4], [-37.8,-13.5], [-34.6,-12.1], [-31.0,-12.1], [-28.4,-13.0], [-25.9,-15.4], [-24.3,-22.0]];
+const MANE_OUTER_PTS = [[20.4,-80.4], [14.8,-78.2], [11.7,-74.8], [10.5,-71.2], [7.8,-69.5], [4.9,-66.1], [3.7,-62.0], [4.0,-58.9], [5.2,-56.5], [4.5,-53.6], [-10.7,-54.1], [-15.3,-52.6], [-18.5,-50.4]];
+const MANE_INNER_PTS = [[27.6,-81.3], [20.4,-72.9], [18.8,-64.9], [22.4,-58.5], [24.0,-52.9], [21.6,-49.7]];
+const HOOF_CUFFS = [[-15.6, 10], [-4.25, 11], [14.85, 14], [28.45, 10]];
+const HORSE_EYE = [29.6, -68.1];
+const HORSE_NOSTRIL = [43.3, -59.9];
+
+// Three hand-picked color variants (mane/tail + horn). A CSS hue-rotate
+// filter was tried first but gave muddy, inconsistently-named results on
+// this hand-colored palette (e.g. "pink" turning olive), so each variant
+// is an explicit color set instead.
+const PALETTES = [
+  { mane: '#f3b6da', hornFill: '#ffd966', hornStroke: '#c9972f' }, // classic
+  { mane: '#ff6fae', hornFill: '#ffd966', hornStroke: '#c9972f' }, // hot pink
+  { mane: '#8ec9f0', hornFill: '#ffd966', hornStroke: '#c9972f' }, // blue
+];
+
 const BRICK_SPEED_RATIO = 0.09; // fraction of screen width crossed per second
 const BRICK_SPAWN_INTERVAL = 2; // seconds
 const BRICK_HEIGHT = 50;
@@ -114,7 +136,7 @@ const DECOY_WORDS = [
 // ---- Game state ----
 const state = {
   character: '🦄',
-  characterFilter: 'none',
+  paletteIndex: 0,
   sentenceWords: [],
   queue: [],
   bricks: [],
@@ -503,7 +525,7 @@ canvas.addEventListener('pointerdown', e => {
 
 document.querySelectorAll('.char-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    state.characterFilter = btn.dataset.filter;
+    state.paletteIndex = Number(btn.dataset.palette);
     startScreenEl.classList.add('hidden');
     prepareSentence();
     showSentencePreview();
@@ -698,17 +720,75 @@ function drawTrees() {
   for (const t of trees) drawTree(t);
 }
 
+function pathFromPoints(points) {
+  ctx.moveTo(points[0][0], points[0][1]);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+  ctx.closePath();
+}
+
 function drawAnimal() {
   ctx.save();
-  ctx.filter = state.characterFilter;
-  // Animal emoji face left by default; mirror horizontally so it faces right,
-  // towards the incoming bricks.
-  ctx.translate(ANIMAL_X, state.animalY);
-  ctx.scale(-1, 1);
-  ctx.font = `${ANIMAL_SIZE}px serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(state.character, 0, 0);
+  const palette = PALETTES[state.paletteIndex] || PALETTES[0];
+  // Local origin sits at the hoof line, under the body; the horse is drawn
+  // facing right (+x), towards the incoming bricks. The outline, mane, tail,
+  // horn and hooves below are traced from a reference illustration (see the
+  // _trace*.py scripts) rather than hand-eyeballed, so the proportions match.
+  const trotting = !state.airborne && state.sentenceActive;
+  const bob = trotting ? Math.abs(Math.sin(ambientElapsed / 90)) * 3 : 0;
+  ctx.translate(ANIMAL_X, state.animalY - bob);
+  ctx.lineJoin = 'round';
+
+  // Base silhouette
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#5c5468';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  pathFromPoints(HORSE_OUTLINE);
+  ctx.fill();
+  ctx.stroke();
+
+  // Tail
+  ctx.fillStyle = palette.mane;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  pathFromPoints(TAIL_PTS);
+  ctx.fill();
+  ctx.stroke();
+
+  // Mane: traced outer edge, hand-fit inner edge
+  ctx.beginPath();
+  pathFromPoints(MANE_OUTER_PTS.concat(MANE_INNER_PTS.slice().reverse()));
+  ctx.fill();
+  ctx.stroke();
+
+  // Horn
+  ctx.fillStyle = palette.hornFill;
+  ctx.strokeStyle = palette.hornStroke;
+  ctx.beginPath();
+  pathFromPoints(HORN_PTS);
+  ctx.fill();
+  ctx.stroke();
+
+  // Hoof "sock" cuffs
+  ctx.fillStyle = '#f6eef8';
+  ctx.strokeStyle = '#5c5468';
+  ctx.lineWidth = 2.5;
+  for (const [cx, w] of HOOF_CUFFS) {
+    ctx.beginPath();
+    ctx.roundRect(cx - w / 2, -16, w, 16, w * 0.2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Eye and nostril
+  ctx.fillStyle = '#3a3a3a';
+  ctx.beginPath();
+  ctx.ellipse(HORSE_EYE[0], HORSE_EYE[1], 3.2, 3.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(HORSE_NOSTRIL[0], HORSE_NOSTRIL[1], 1.6, 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 
