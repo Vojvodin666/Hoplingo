@@ -18,14 +18,13 @@ const HOOF_CUFFS = [[-15.6, 10], [-4.25, 11], [14.85, 14], [28.45, 10]];
 const HORSE_EYE = [29.6, -68.1];
 const HORSE_NOSTRIL = [43.3, -59.9];
 
-// Three hand-picked color variants (mane/tail + horn). A CSS hue-rotate
+// Two hand-picked color variants (mane/tail + horn). A CSS hue-rotate
 // filter was tried first but gave muddy, inconsistently-named results on
 // this hand-colored palette (e.g. "pink" turning olive), so each variant
 // is an explicit color set instead.
 const PALETTES = [
-  { mane: '#f3b6da', hornFill: '#ffd966', hornStroke: '#c9972f' }, // classic
-  { mane: '#ff6fae', hornFill: '#ffd966', hornStroke: '#c9972f' }, // hot pink
-  { mane: '#8ec9f0', hornFill: '#ffd966', hornStroke: '#c9972f' }, // blue
+  { name: 'Polárka', mane: '#9b59e0', hornFill: '#ffd966', hornStroke: '#c9972f' }, // purple
+  { name: 'Uhlík', mane: '#ff5e1a', hornFill: '#ffd966', hornStroke: '#c9972f' }, // fire orange
 ];
 
 const BRICK_SPEED_RATIO = 0.09; // fraction of screen width crossed per second
@@ -505,7 +504,7 @@ function handleJumpInput() {
 }
 
 function canAcceptJumpInput() {
-  return state.running && sentencePreviewEl.classList.contains('hidden');
+  return state.running && startScreenEl.classList.contains('hidden') && sentencePreviewEl.classList.contains('hidden');
 }
 
 document.addEventListener('keydown', e => {
@@ -527,6 +526,7 @@ document.querySelectorAll('.char-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     state.paletteIndex = Number(btn.dataset.palette);
     startScreenEl.classList.add('hidden');
+    state.errors = 0;
     prepareSentence();
     showSentencePreview();
   });
@@ -537,9 +537,7 @@ startBtn.addEventListener('click', activateSentence);
 newGameBtn.addEventListener('click', () => {
   resultScreenEl.classList.add('hidden');
   stopConfetti();
-  state.errors = 0;
-  prepareSentence();
-  showSentencePreview();
+  startScreenEl.classList.remove('hidden');
 });
 
 // ---- Update / render ----

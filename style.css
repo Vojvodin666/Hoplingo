@@ -69,11 +69,15 @@ canvas {
 }
 
 .char-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   font-size: clamp(40px, 7vw, 56px);
   background: rgba(255, 255, 255, 0.1);
   border: 3px solid transparent;
   border-radius: 16px;
-  padding: 10px 16px;
+  padding: 10px 20px;
   cursor: pointer;
   transition: transform 0.15s, border-color 0.15s, background 0.15s;
 }
@@ -81,6 +85,12 @@ canvas {
 .char-face {
   display: inline-block;
   transform: scaleX(-1);
+}
+
+.char-name {
+  font-size: clamp(14px, 2vw, 18px);
+  font-weight: bold;
+  color: #ffffff;
 }
 
 .char-btn:hover {
