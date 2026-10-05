@@ -18,13 +18,67 @@ const HOOF_CUFFS = [[-15.6, 10], [-4.25, 11], [14.85, 14], [28.45, 10]];
 const HORSE_EYE = [29.6, -68.1];
 const HORSE_NOSTRIL = [43.3, -59.9];
 
+// Vertical extent of the mane shape, used to anchor the top-to-bottom
+// gradient so it spans exactly the mane (not the whole horse).
+const MANE_Y_TOP = Math.min(...MANE_OUTER_PTS.concat(MANE_INNER_PTS).map(p => p[1]));
+const MANE_Y_BOTTOM = Math.max(...MANE_OUTER_PTS.concat(MANE_INNER_PTS).map(p => p[1]));
+
+// Arc-length parametrization of the mane's outer/inner edges, so the mane
+// can be sliced into even strands along its length (head to withers) for
+// the alternating-color variant.
+function cumulativeLengths(points) {
+  const lens = [0];
+  for (let i = 1; i < points.length; i++) {
+    const [x0, y0] = points[i - 1];
+    const [x1, y1] = points[i];
+    lens.push(lens[i - 1] + Math.hypot(x1 - x0, y1 - y0));
+  }
+  return lens;
+}
+
+function pointAtFraction(points, lens, frac) {
+  const target = frac * lens[lens.length - 1];
+  for (let i = 1; i < points.length; i++) {
+    if (target <= lens[i] || i === points.length - 1) {
+      const segLen = lens[i] - lens[i - 1];
+      const segT = segLen === 0 ? 0 : (target - lens[i - 1]) / segLen;
+      const [x0, y0] = points[i - 1];
+      const [x1, y1] = points[i];
+      return [x0 + (x1 - x0) * segT, y0 + (y1 - y0) * segT];
+    }
+  }
+  return points[points.length - 1];
+}
+
+const MANE_OUTER_LENS = cumulativeLengths(MANE_OUTER_PTS);
+const MANE_INNER_LENS = cumulativeLengths(MANE_INNER_PTS);
+
+// Flame-like alternation pattern (index into a 2-color maneColors array),
+// deliberately irregular rather than a strict 0-1-0-1 checker.
+const MANE_STRAND_PATTERN = [0, 1, 1, 0, 1, 0, 1];
+
 // Two hand-picked color variants (mane/tail + horn). A CSS hue-rotate
 // filter was tried first but gave muddy, inconsistently-named results on
 // this hand-colored palette (e.g. "pink" turning olive), so each variant
 // is an explicit color set instead.
+// `mane` is the solid tail color; `maneType`/`maneColors` control the mane
+// itself, which is rendered as either a top-to-bottom gradient or a set of
+// alternating solid-color strands (see drawAnimal).
 const PALETTES = [
-  { name: 'Polárka', mane: '#9b59e0', hornFill: '#ffd966', hornStroke: '#c9972f' }, // purple
-  { name: 'Uhlík', mane: '#ff5e1a', hornFill: '#ffd966', hornStroke: '#c9972f' }, // fire orange
+  {
+    name: 'Polárka',
+    mane: '#9b59e0', // purple tail
+    hornFill: '#ffd966', hornStroke: '#c9972f',
+    maneType: 'gradient',
+    maneColors: ['#9b59e0', '#4caf50', '#e74c3c', '#f5d020'], // purple -> green -> red -> yellow
+  },
+  {
+    name: 'Uhlík',
+    mane: '#ff5e1a', // fire orange tail
+    hornFill: '#ffd966', hornStroke: '#c9972f',
+    maneType: 'strands',
+    maneColors: ['#9b59e0', '#ff5e1a'], // purple + orange, flame-like alternation
+  },
 ];
 
 const BRICK_SPEED_RATIO = 0.09; // fraction of screen width crossed per second
@@ -38,6 +92,10 @@ const CLOUD_SPEED_MIN = 15;
 const CLOUD_SPEED_MAX = 30;
 const SUN_SPEED = 6; // px/s, slower than the clouds
 const TREE_SPEED = 50; // px/s, slower than bricks for a background parallax feel
+const FLOWER_COLORS = ['#ff6fa8', '#ffd23f', '#9b6bff', '#ff6b4a', '#5ec8ff'];
+const RAINBOW_COLORS = ['#ff3b30', '#ff9500', '#ffe135', '#4cd964', '#34aadc', '#3a5fcd', '#8a4fff'];
+const BIRD_SPEED_MIN = 70; // px/s, faster than clouds so it reads as closer/quicker
+const BIRD_SPEED_MAX = 110;
 
 // Mutable, recomputed on load/resize since the game runs fullscreen.
 let W, H, GRASS_HEIGHT, GROUND_Y, JUMP_HEIGHT, JUMP_VELOCITY;
@@ -47,8 +105,12 @@ let BRICK_SPEED, BRICK_Y_MIN, BRICK_Y_MAX;
 let clouds = [];
 let sun = null;
 let trees = [];
+let flowers = [];
+let birds = [];
 let ambientElapsed = 0;
 let nextTreeAt = 1500;
+let nextFlowerAt = 800;
+let nextBirdAt = 4000;
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -561,12 +623,36 @@ function updateAmbientScenery(dt) {
   }
 
   if (ambientElapsed >= nextTreeAt) {
-    trees.push({ x: W + 40, size: 0.8 + Math.random() * 0.6 });
+    trees.push({ x: W + 40, y: H - GRASS_HEIGHT + 20 + Math.random() * (GRASS_HEIGHT - 40), size: 0.8 + Math.random() * 0.6 });
     nextTreeAt = ambientElapsed + 6000 + Math.random() * 8000;
   }
   for (let i = trees.length - 1; i >= 0; i--) {
     trees[i].x -= TREE_SPEED * dt;
     if (trees[i].x < -80) trees.splice(i, 1);
+  }
+
+  if (ambientElapsed >= nextFlowerAt) {
+    flowers.push({ x: W + 20, y: H - GRASS_HEIGHT + 10 + Math.random() * (GRASS_HEIGHT - 20), size: 0.6 + Math.random() * 0.5, color: randomFrom(FLOWER_COLORS) });
+    nextFlowerAt = ambientElapsed + 2500 + Math.random() * 3500;
+  }
+  for (let i = flowers.length - 1; i >= 0; i--) {
+    flowers[i].x -= TREE_SPEED * dt;
+    if (flowers[i].x < -20) flowers.splice(i, 1);
+  }
+
+  if (ambientElapsed >= nextBirdAt) {
+    birds.push({
+      x: W + 30,
+      y: 40 + Math.random() * (H * 0.3),
+      speed: BIRD_SPEED_MIN + Math.random() * (BIRD_SPEED_MAX - BIRD_SPEED_MIN),
+      size: 0.8 + Math.random() * 0.5,
+      phase: Math.random() * Math.PI * 2,
+    });
+    nextBirdAt = ambientElapsed + 8000 + Math.random() * 12000;
+  }
+  for (let i = birds.length - 1; i >= 0; i--) {
+    birds[i].x -= birds[i].speed * dt;
+    if (birds[i].x < -40) birds.splice(i, 1);
   }
 }
 
@@ -700,7 +786,7 @@ function drawClouds() {
 function drawTree(t) {
   const trunkW = 10 * t.size;
   const trunkH = 34 * t.size;
-  const baseY = GROUND_Y + 4;
+  const baseY = t.y;
   const foliageR = 30 * t.size;
 
   ctx.fillStyle = '#7a4a27';
@@ -718,10 +804,107 @@ function drawTrees() {
   for (const t of trees) drawTree(t);
 }
 
+function drawFlower(f) {
+  const baseY = f.y;
+  const stemH = 14 * f.size;
+  const cy = baseY - stemH;
+  const petalR = 5 * f.size;
+
+  ctx.strokeStyle = '#3f8f3f';
+  ctx.lineWidth = 2 * f.size;
+  ctx.beginPath();
+  ctx.moveTo(f.x, baseY);
+  ctx.lineTo(f.x, cy);
+  ctx.stroke();
+
+  ctx.fillStyle = f.color;
+  for (let i = 0; i < 5; i++) {
+    const angle = (Math.PI * 2 * i) / 5;
+    ctx.beginPath();
+    ctx.arc(f.x + Math.cos(angle) * petalR, cy + Math.sin(angle) * petalR, petalR * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(f.x, cy, petalR * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawFlowers() {
+  for (const f of flowers) drawFlower(f);
+}
+
+// Wings drawn as two curves meeting at the body point; wingLift oscillates
+// so the tips swing from raised ("^") to lowered ("v") each flap cycle.
+function drawBird(b) {
+  const flap = Math.sin(ambientElapsed / 120 + b.phase);
+  const wingLift = flap * 6 * b.size;
+  const span = 10 * b.size;
+
+  ctx.strokeStyle = '#4a4a4a';
+  ctx.lineWidth = 2 * b.size;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(b.x - span, b.y - wingLift);
+  ctx.quadraticCurveTo(b.x - span * 0.4, b.y + wingLift * 0.3, b.x, b.y);
+  ctx.quadraticCurveTo(b.x + span * 0.4, b.y + wingLift * 0.3, b.x + span, b.y - wingLift);
+  ctx.stroke();
+}
+
+function drawBirds() {
+  for (const b of birds) drawBird(b);
+}
+
+function drawRainbow() {
+  const horizonY = H - GRASS_HEIGHT;
+  const cx = W * 0.22;
+  const radius = Math.min(W * 0.25, horizonY * 0.9);
+  const bandWidth = radius * 0.05;
+
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  ctx.lineCap = 'butt';
+  RAINBOW_COLORS.forEach((color, i) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = bandWidth;
+    ctx.beginPath();
+    ctx.arc(cx, horizonY, radius - i * bandWidth, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  });
+  ctx.restore();
+}
+
 function pathFromPoints(points) {
   ctx.moveTo(points[0][0], points[0][1]);
   for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
   ctx.closePath();
+}
+
+// Fills the mane as a series of solid-color strands running along its
+// length (head to withers), alternating between the given colors, then
+// strokes the overall mane outline so the strand seams stay invisible.
+function drawManeStrands(colors) {
+  const count = MANE_STRAND_PATTERN.length;
+  for (let i = 0; i < count; i++) {
+    const t0 = i / count;
+    const t1 = (i + 1) / count;
+    const o0 = pointAtFraction(MANE_OUTER_PTS, MANE_OUTER_LENS, t0);
+    const o1 = pointAtFraction(MANE_OUTER_PTS, MANE_OUTER_LENS, t1);
+    const n0 = pointAtFraction(MANE_INNER_PTS, MANE_INNER_LENS, t0);
+    const n1 = pointAtFraction(MANE_INNER_PTS, MANE_INNER_LENS, t1);
+    ctx.fillStyle = colors[MANE_STRAND_PATTERN[i % MANE_STRAND_PATTERN.length]];
+    ctx.beginPath();
+    ctx.moveTo(o0[0], o0[1]);
+    ctx.lineTo(o1[0], o1[1]);
+    ctx.lineTo(n1[0], n1[1]);
+    ctx.lineTo(n0[0], n0[1]);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.beginPath();
+  pathFromPoints(MANE_OUTER_PTS.concat(MANE_INNER_PTS.slice().reverse()));
+  ctx.stroke();
 }
 
 function drawAnimal() {
@@ -754,10 +937,17 @@ function drawAnimal() {
   ctx.stroke();
 
   // Mane: traced outer edge, hand-fit inner edge
-  ctx.beginPath();
-  pathFromPoints(MANE_OUTER_PTS.concat(MANE_INNER_PTS.slice().reverse()));
-  ctx.fill();
-  ctx.stroke();
+  if (palette.maneType === 'strands') {
+    drawManeStrands(palette.maneColors);
+  } else {
+    const grad = ctx.createLinearGradient(0, MANE_Y_TOP, 0, MANE_Y_BOTTOM);
+    palette.maneColors.forEach((c, i) => grad.addColorStop(i / (palette.maneColors.length - 1), c));
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    pathFromPoints(MANE_OUTER_PTS.concat(MANE_INNER_PTS.slice().reverse()));
+    ctx.fill();
+    ctx.stroke();
+  }
 
   // Horn
   ctx.fillStyle = palette.hornFill;
@@ -811,9 +1001,12 @@ function drawBricks() {
 
 function render() {
   drawBackground();
+  drawRainbow();
   drawSun();
   drawClouds();
+  drawBirds();
   drawTrees();
+  drawFlowers();
   drawBricks();
   drawAnimal();
 }
